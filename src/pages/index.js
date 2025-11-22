@@ -1,78 +1,128 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+import { useEffect, useState } from "react";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+function fmt(ts) {
+  try { return new Date(ts).toLocaleString(); } catch { return "-"; }
+}
 
 export default function Home() {
+  const [todos, setTodos] = useState([]);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState("todo");
+  const [editingId, setEditingId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [editingDescription, setEditingDescription] = useState("");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("todos:v1");
+      if (raw) setTodos(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem("todos:v1", JSON.stringify(todos)); } catch {}
+  }, [todos]);
+
+  const addTodo = (e) => {
+    e.preventDefault();
+    const t = title.trim();
+    if (!t) return;
+    const now = Date.now();
+    const item = { id: uid(), title: t, description: description.trim(), completed: false, createdAt: now, updatedAt: now };
+    setTodos((s) => [item, ...s]);
+    setTitle(""); setDescription("");
+  };
+
+  const deleteTodo = (id) => setTodos((s) => s.filter((it) => it.id !== id));
+  const toggleComplete = (id) => setTodos((s) => s.map((it) => it.id === id ? {...it, completed: !it.completed, updatedAt: Date.now()} : it));
+  const startEditing = (item) => { setEditingId(item.id); setEditingTitle(item.title); setEditingDescription(item.description || ""); };
+  const saveEdit = (e) => {
+    e.preventDefault();
+    const t = editingTitle.trim(); if (!t) return;
+    setTodos((s) => s.map((it) => it.id === editingId ? {...it, title: t, description: editingDescription.trim(), updatedAt: Date.now()} : it));
+    setEditingId(null); setEditingTitle(""); setEditingDescription("");
+  };
+
+  const visible = todos.filter((it) => {
+    if(tab==="todo" && it.completed) return false;
+    if(tab==="completed" && !it.completed) return false;
+    if(search){
+      const q = search.toLowerCase();
+      if(!(it.title.toLowerCase().includes(q) || (it.description||"").toLowerCase().includes(q))) return false;
+    }
+    return true;
+  });
+
   return (
-    <div
-      className={`${geistSans.className} ${geistMono.className} flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black`}
-    >
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the index.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs/pages/getting-started?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="page">
+      <div className="app-container">
+
+        <header className="header">
+          <div className="brand">My Tasks</div>
+          <div style={{ display:"flex", gap:"10px" }}>
+            <button className={`nav-btn ${tab==="todo"?"active":""}`} onClick={()=>setTab("todo")}>To Do</button>
+            <button className={`nav-btn ${tab==="completed"?"active":""}`} onClick={()=>setTab("completed")}>Completed</button>
+          </div>
+          <input className="search" placeholder="Search tasks..." value={search} onChange={(e)=>setSearch(e.target.value)} />
+        </header>
+
+        <section className="panel create">
+          <h2 className="panel-title">Create Task</h2>
+          <form className="form" onSubmit={addTodo}>
+            <input className="field title" placeholder="Title" value={title} onChange={(e)=>setTitle(e.target.value)} />
+            <textarea className="field desc" placeholder="Description (optional)" value={description} onChange={(e)=>setDescription(e.target.value)} />
+            <div className="form-actions">
+              <button type="submit" className="primary">Add Task</button>
+            </div>
+          </form>
+        </section>
+
+        <section className="panel list">
+          <h2 className="panel-title">{tab==="todo"?"To Do":"Completed"}</h2>
+          {visible.length===0?<div className="empty">No tasks — add one.</div>:
+            <div className="grid">
+              {visible.map(it=>(
+                <div key={it.id} className={`card ${it.completed?"done":""}`}>
+                  <div className="card-left">
+                    <input type="checkbox" checked={it.completed} onChange={()=>toggleComplete(it.id)} />
+                  </div>
+                  <div className="card-body">
+                    {editingId===it.id?
+                      <form className="edit" onSubmit={saveEdit}>
+                        <input className="field title" value={editingTitle} onChange={(e)=>setEditingTitle(e.target.value)} />
+                        <textarea className="field desc" value={editingDescription} onChange={(e)=>setEditingDescription(e.target.value)} />
+                        <div className="card-actions">
+                          <button type="button" className="primary small" onClick={saveEdit}>Save</button>
+                          <button type="button" className="ghost small" onClick={()=>setEditingId(null)}>Cancel</button>
+                        </div>
+                      </form>
+                      :
+                      <>
+                        <h3 className="card-title">{it.title}</h3>
+                        {it.description && <p className="card-desc">{it.description}</p>}
+                        <div className="meta">Created: {fmt(it.createdAt)} · Updated: {fmt(it.updatedAt)}</div>
+                      </>
+                    }
+                  </div>
+                  <div className="card-right">
+                    {editingId!==it.id && <>
+                      <button className="ghost small" onClick={()=>startEditing(it)}>Edit</button>
+                      <button className="danger small" onClick={()=>deleteTodo(it.id)}>Delete</button>
+                    </>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          }
+        </section>
+
+      </div>
     </div>
   );
 }
